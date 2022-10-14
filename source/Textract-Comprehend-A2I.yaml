@@ -315,7 +315,7 @@ Resources:
                   NotificationConfiguration={}
               )
               print("Delete request completed....")
-      Runtime: python3.6
+      Runtime: python3.8
       Timeout: 80
 
   # Custom Trigger to Invoke the Textract Comprehend Lambda

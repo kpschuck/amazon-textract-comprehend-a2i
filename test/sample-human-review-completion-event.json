@@ -1,0 +1,24 @@
+{
+    "version": "0",
+    "id": "44a470cd-7387-4b93-871f-57a7f48ce4d8",
+    "detail-type": "SageMaker A2I HumanLoop Status Change",
+    "source": "aws.sagemaker",
+    "account": "012345678901",
+    "time": "2022-10-14T19:21:08Z",
+    "region": "us-east-1",
+    "resources": [
+        "arn:aws:sagemaker:us-east-1:012345678901:human-loop/TCA2I-012345678901"
+    ],
+    "detail": {
+        "creationTime": "2022-10-14T19:11:08.513Z",
+        "failureCode": null,
+        "failureReason": null,
+        "flowDefinitionArn": "arn:aws:sagemaker:us-east-1:012345678901:flow-definition/human-review",
+        "humanLoopArn": "arn:aws:sagemaker:us-east-1:012345678901:human-loop/TCA2I-012345678901",
+        "humanLoopName": "TCA2I-012345678901",
+        "humanLoopOutput": {
+            "outputS3Uri": "s3://idp-us-east-1/idp-human-review/2022/10/14/19/11/08/TCA2I-012345678901/output.json"
+        },
+        "humanLoopStatus": "Completed"
+    }
+}

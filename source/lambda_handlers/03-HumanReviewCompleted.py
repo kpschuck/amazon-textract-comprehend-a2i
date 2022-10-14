@@ -154,7 +154,7 @@ def lambda_handler(event, context):
                 s3 = boto3.resource('s3')
                 comprehend_data_bucket_object = s3.Bucket(comprehend_data_bucket)
                 comprehend_data_bucket_object.upload_file('/tmp/entities_file.csv', comprehend_entity_file_key)
-                print("NewEntityFileUploaded")
+                print(f"NewEntityFileUploaded: {comprehend_data_bucket}/{comprehend_entity_file_key}")
                 print("The model will be retrained")
             else:
                 print("All annotated entities are already present in the training data.")

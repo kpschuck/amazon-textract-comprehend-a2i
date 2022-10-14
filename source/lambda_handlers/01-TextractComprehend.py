@@ -26,7 +26,53 @@ from urllib.parse import unquote_plus
 import json
 import boto3
 import re
+import time
 
+def start_job(client, s3_bucket_name, object_name):
+    response = None
+    response = client.start_document_text_detection(
+        DocumentLocation={
+            'S3Object': {
+                'Bucket': s3_bucket_name,
+                'Name': object_name
+            }})
+
+    return response["JobId"]
+
+def is_job_complete(client, job_id):
+    time.sleep(1)
+    response = client.get_document_text_detection(JobId=job_id)
+    status = response["JobStatus"]
+    print("Job status: {}".format(status))
+
+    while(status == "IN_PROGRESS"):
+        time.sleep(1)
+        response = client.get_document_text_detection(JobId=job_id)
+        status = response["JobStatus"]
+        print("Job status: {}".format(status))
+
+    return status
+
+def get_job_results(client, job_id):
+    pages = []
+    time.sleep(1)
+    response = client.get_document_text_detection(JobId=job_id)
+    pages.append(response)
+    print("Resultset page received: {}".format(len(pages)))
+    next_token = None
+    if 'NextToken' in response:
+        next_token = response['NextToken']
+
+    while next_token:
+        time.sleep(1)
+        response = client.get_document_text_detection(JobId=job_id, NextToken=next_token)
+        pages.append(response)
+        print("Resultset page received: {}".format(len(pages)))
+        next_token = None
+        if 'NextToken' in response:
+            next_token = response['NextToken']
+
+    return pages
 
 def lambda_handler(event, context):
     # Create an SSM Client
@@ -60,41 +106,37 @@ def lambda_handler(event, context):
         bucket = record['s3']['bucket']['name']
         key = unquote_plus(record['s3']['object']['key'])
 
-        # Send S3 Object to Textract
-        response = textract_client.detect_document_text(
-            Document={'S3Object': {'Bucket': bucket, 'Name': key}})
+        job_id = start_job(textract_client, bucket, key)
+        print("Started Textract job with id: {}".format(job_id))
+        if is_job_complete(textract_client, job_id):
+            response = get_job_results(textract_client, job_id)
 
         # Get just the filename (without input/ or trailing filetype)
         filename = ".".join(key.split(".")[:-1])
         filename = "/".join(filename.split("/")[1:])
 
-        # Get the text blocks
-        blocks = response['Blocks']
-
         # Save the JSON response from Textract to a folder in the S3 bucket
         raw_textract_data_response = s3_client.put_object(
             Bucket=bucket,
             Key='textract-output/raw/' + filename + '.json',
-            Body=json.dumps(blocks)
+            Body=json.dumps(response)
         )
         print(f'Text Extraction Complete for {bucket}/{key}')
 
-        # Recreate the raw text from the Textract Output
-        raw_text = ""
-        for block in blocks[1:]:
-            if (block['BlockType'] == "WORD"):
-                break
-            raw_text = raw_text + block['Text'] + " "
-
-        # Store it in an S3 bucket
-        processed_data_key = 'textract-output/processed/' + filename + '.txt'
+        # Process raw Textract output
+        processed_text = ""
+        for result_page in response:
+            for block in result_page["Blocks"]:
+                if block["BlockType"] == "LINE":
+                    processed_text = processed_text + block["Text"] + "\n"
 
         # Store Processed Data in S3 Bucket
-        processed_textract_data_response = s3_client.put_object(
-            Bucket=bucket,
-            Key=processed_data_key,
-            Body=json.dumps(raw_text)
-        )
+        processed_data_key = 'textract-output/processed/' + filename + '.txt'
+        localFile = '/tmp/processed-textract.txt'
+        with open(localFile, 'w') as fd:
+            fd.write(processed_text)
+        s3_client.upload_file(localFile, bucket, processed_data_key)
+        print(f'Processed Textract output stored in {bucket}/{processed_data_key}')
 
         # Start the Custom Entity Recognition Job
         response = comprehend_client.start_entities_detection_job(
